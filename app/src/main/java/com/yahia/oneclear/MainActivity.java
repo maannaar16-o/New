@@ -32,8 +32,6 @@ import java.util.List;
  */
 public class MainActivity extends Activity {
 
-    public static final String EXTRA_AUTOSTART = "autostart";
-
     private static final int REQ_PERMS = 101;
     private static final int REQ_DEFAULT_SMS = 102;
 
@@ -92,6 +90,16 @@ public class MainActivity extends Activity {
         });
         root.addView(confirmBox);
 
+        final CheckBox openAccountsBox = new CheckBox(this);
+        openAccountsBox.setText("افتح شاشة الحسابات بعد المسح (لإزالتها يدويًا)");
+        openAccountsBox.setChecked(Prefs.isOpenAccountsEnabled(this));
+        openAccountsBox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            public void onCheckedChanged(CompoundButton bv, boolean checked) {
+                Prefs.setOpenAccountsEnabled(MainActivity.this, checked);
+            }
+        });
+        root.addView(openAccountsBox);
+
         Button accountsBtn = button("فتح شاشة الحسابات (لإزالتها يدويًا)");
         accountsBtn.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { WipeFlow.openAccountsSettings(MainActivity.this); }
@@ -106,14 +114,13 @@ public class MainActivity extends Activity {
         root.addView(restoreSmsBtn);
 
         root.addView(space(dp(12)));
-        root.addView(body("للضغطة الواحدة من الشاشة الرئيسية: اضغط مطوّلًا على الشاشة ← الودجتس (Widgets) "
-                + "← اختر «مسح بضغطة واحدة» وضعه على الشاشة."));
+        root.addView(body("الضغطة الواحدة الحقيقية (بدون فتح التطبيق):\n"
+                + "1) اعمل الإعداد مرة واحدة هنا: اضغط «امسح الآن» واقبل الصلاحيات + اجعله «تطبيق الرسائل الافتراضي».\n"
+                + "2) اضغط مطوّلًا على الشاشة الرئيسية ← الودجتس (Widgets) ← اختر «مسح بضغطة واحدة» وضعه على الشاشة.\n"
+                + "بعدها أي ضغطة على الودجت تمسح المكالمات والرسائل في الخلفية فورًا، دون فتح التطبيق.\n"
+                + "لمسح فوري تمامًا بلا أي نافذة: أزل علامة «اطلب تأكيد قبل المسح»."));
 
         setContentView(scroll);
-
-        if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_AUTOSTART, false)) {
-            startWipeWithConfirm();
-        }
     }
 
     @Override

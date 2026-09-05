@@ -1,10 +1,12 @@
 package com.yahia.oneclear;
 
+import android.Manifest;
 import android.accounts.Account;
 import android.accounts.AccountManager;
 import android.app.role.RoleManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.CallLog;
@@ -42,6 +44,37 @@ public final class WipeFlow {
         } catch (Exception e) {
             return -1;
         }
+    }
+
+    public static boolean hasWriteCallLog(Context c) {
+        return c.checkSelfPermission(Manifest.permission.WRITE_CALL_LOG)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
+    /**
+     * Performs the whole wipe with no dialogs and returns a short Arabic summary.
+     * Assumes setup is already done (permissions granted, default SMS app set);
+     * anything not set up is reported in the summary rather than prompted for.
+     * Safe to call off the main thread.
+     */
+    public static String runSilentWipe(Context c) {
+        String callsLine;
+        if (hasWriteCallLog(c)) {
+            int calls = wipeCallLog(c);
+            callsLine = (calls >= 0) ? ("المكالمات: حُذف " + calls) : "المكالمات: تعذّر";
+        } else {
+            callsLine = "المكالمات: تخطّي (افتح التطبيق واقبل الصلاحية)";
+        }
+
+        String smsLine;
+        if (isDefaultSms(c)) {
+            int sms = wipeSms(c);
+            smsLine = (sms >= 0) ? ("الرسائل: حُذف " + sms) : "الرسائل: تعذّر";
+        } else {
+            smsLine = "الرسائل: تخطّي (اجعل التطبيق الافتراضي من داخله)";
+        }
+
+        return callsLine + " • " + smsLine;
     }
 
     /** True if this app currently holds the default-SMS role. */
