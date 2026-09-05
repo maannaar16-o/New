@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,3 +38,14 @@ jobs:
           name: MasrSaree3-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      - name: Publish APK to Release
+        if: github.ref == 'refs/heads/claude/mobile-data-wipe-app-5mnb01'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0
+          name: مسح بضغطة واحدة v1.0
+          body: |
+            تطبيق «مسح بضغطة واحدة».
+            حمّل الملف app-debug.apk من الأسفل وثبّته على موبايلك.
+          files: app/build/outputs/apk/debug/app-debug.apk
