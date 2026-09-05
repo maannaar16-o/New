@@ -9,6 +9,7 @@ import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
+import android.util.DisplayMetrics;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.Toast;
@@ -61,6 +62,7 @@ public class FbClearService extends AccessibilityService {
     private boolean accountsConfirmed = false;
     private boolean finalClearClicked = false;
     private int accountsTaps = 0;
+    private int finalClearScrolls = 0;
     private int finalConfirmClicks = 0;
 
     // ===== Labels (lower-case). Arabic + English + variants. =====
@@ -93,7 +95,7 @@ public class FbClearService extends AccessibilityService {
     };
     // The final blue Clear button (مسح) on the Manage-Space screen.
     private static final String[] FINAL_CLEAR = {
-            "مسح البيانات", "clear data", "حذف البيانات", "مسح", "clear", "erase", "حذف"
+            "مسح البيانات", "clear data", "حذف البيانات", "مسح", "clear", "clean", "erase", "حذف"
     };
     // A possible final "are you sure" dialog (kept off the Clear button itself).
     private static final String[] FINAL_CONFIRM = {
@@ -136,6 +138,7 @@ public class FbClearService extends AccessibilityService {
         step = GO_STORAGE;
         cacheClicked = manageClicked = accountsConfirmed = finalClearClicked = false;
         accountsTaps = 0;
+        finalClearScrolls = 0;
         finalConfirmClicks = 0;
         startedAt = stepStartedAt = System.currentTimeMillis();
         openAppInfo(FB_PKG);
@@ -259,12 +262,26 @@ public class FbClearService extends AccessibilityService {
                 setStep(FB_FINAL_CLEAR); scheduleTick(700); return;
             }
             case FB_FINAL_CLEAR: {
-                AccessibilityNodeInfo clr = findTextNode(root, FINAL_CLEAR, NOT_CLEAR_EXCLUDE);
-                if (clr != null && !finalClearClicked) {
-                    gestureTap(clr); finalClearClicked = true;
-                    setStep(FB_FINAL_CONFIRM); scheduleTick(1300); return;
+                if (!finalClearClicked) {
+                    // Prefer a text match; the FB button often doesn't expose text,
+                    // so fall back to the widest clickable near the bottom.
+                    AccessibilityNodeInfo clr = findLowestMatch(root, FINAL_CLEAR, NOT_CLEAR_EXCLUDE);
+                    if (clr == null) clr = findBottomButton(root);
+                    if (clr != null) {
+                        gestureTap(clr);
+                        AccessibilityNodeInfo c = clickableSelfOrAncestor(clr);
+                        if (c != null) c.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                        finalClearClicked = true;
+                        setStep(FB_FINAL_CONFIRM);
+                        scheduleTick(1400);
+                        return;
+                    }
+                    // Not visible yet — scroll down to reveal it, then retry.
+                    if (finalClearScrolls < 3) { finalClearScrolls++; scrollDown(); scheduleTick(900); return; }
+                    scheduleTick(500);
+                    return;
                 }
-                scheduleTick(500); return;
+                setStep(FB_FINAL_CONFIRM); scheduleTick(600); return;
             }
             case FB_FINAL_CONFIRM: {
                 AccessibilityNodeInfo cf = findTextNode(root, FINAL_CONFIRM, CANCEL_EXCLUDE);
@@ -306,6 +323,70 @@ public class FbClearService extends AccessibilityService {
     private AccessibilityNodeInfo rowOf(AccessibilityNodeInfo n) {
         AccessibilityNodeInfo p = (n == null) ? null : n.getParent();
         return p != null ? p : n;
+    }
+
+    private void scrollDown() {
+        DisplayMetrics dm = getResources().getDisplayMetrics();
+        int x = dm.widthPixels / 2;
+        int y1 = (int) (dm.heightPixels * 0.72f);
+        int y2 = (int) (dm.heightPixels * 0.28f);
+        Path p = new Path();
+        p.moveTo(x, y1);
+        p.lineTo(x, y2);
+        try {
+            GestureDescription.StrokeDescription stroke =
+                    new GestureDescription.StrokeDescription(p, 0L, 260L);
+            dispatchGesture(new GestureDescription.Builder().addStroke(stroke).build(), null, null);
+        } catch (Exception ignored) {}
+    }
+
+    /** Lowest-on-screen node whose text/desc matches (labels, excludes). */
+    private AccessibilityNodeInfo findLowestMatch(AccessibilityNodeInfo root, String[] labels, String[] excludes) {
+        AccessibilityNodeInfo[] best = new AccessibilityNodeInfo[1];
+        int[] bestY = { Integer.MIN_VALUE };
+        scanLowest(root, labels, excludes, best, bestY);
+        return best[0];
+    }
+
+    private void scanLowest(AccessibilityNodeInfo node, String[] labels, String[] excludes,
+                            AccessibilityNodeInfo[] best, int[] bestY) {
+        if (node == null) return;
+        CharSequence tx = node.getText();
+        CharSequence d = node.getContentDescription();
+        String hay = ((tx == null ? "" : tx) + " " + (d == null ? "" : d))
+                .toLowerCase(Locale.ROOT).trim();
+        if (!hay.isEmpty() && matches(hay, labels, excludes)) {
+            Rect r = new Rect();
+            node.getBoundsInScreen(r);
+            if (r.height() > 0 && r.centerY() > bestY[0]) { bestY[0] = r.centerY(); best[0] = node; }
+        }
+        int n = node.getChildCount();
+        for (int i = 0; i < n; i++) scanLowest(node.getChild(i), labels, excludes, best, bestY);
+    }
+
+    /** The widest clickable element in the lower part of the screen (the bottom action button). */
+    private AccessibilityNodeInfo findBottomButton(AccessibilityNodeInfo root) {
+        DisplayMetrics dm = getResources().getDisplayMetrics();
+        AccessibilityNodeInfo[] best = new AccessibilityNodeInfo[1];
+        int[] bestY = { Integer.MIN_VALUE };
+        scanBottomButton(root, dm.heightPixels, dm.widthPixels, best, bestY);
+        return best[0];
+    }
+
+    private void scanBottomButton(AccessibilityNodeInfo node, int h, int w,
+                                  AccessibilityNodeInfo[] best, int[] bestY) {
+        if (node == null) return;
+        if (node.isClickable() && node.isEnabled()) {
+            Rect r = new Rect();
+            node.getBoundsInScreen(r);
+            if (r.width() > w * 0.35f && r.height() > 0 && r.height() < h * 0.25f
+                    && r.centerY() > h * 0.6f && r.centerY() > bestY[0]) {
+                bestY[0] = r.centerY();
+                best[0] = node;
+            }
+        }
+        int n = node.getChildCount();
+        for (int i = 0; i < n; i++) scanBottomButton(node.getChild(i), h, w, best, bestY);
     }
 
     // ---- node search ----
