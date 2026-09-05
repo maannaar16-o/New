@@ -57,7 +57,7 @@ public class FbClearService extends AccessibilityService {
             "التخزين والذاكرة المؤقتة", "التخزين والذاكرة", "وحدة التخزين",
             "مساحة التخزين", "استخدام وحدة التخزين", "التخزين"
     };
-    private static final String[] CLEAR_CACHE = {
+    private static final String[] CACHE_LABELS = {
             "clear cache", "empty cache",
             "محو ذاكرة التخزين المؤقت", "مسح ذاكرة التخزين المؤقت",
             "مسح التخزين المؤقت", "إفراغ ذاكرة التخزين المؤقت", "مسح الذاكرة المؤقتة"
@@ -171,7 +171,7 @@ public class FbClearService extends AccessibilityService {
         switch (step) {
             case GO_STORAGE: {
                 // If clear-cache or manage is already visible, skip navigation.
-                if (find(root, CLEAR_CACHE, null) != null || find(root, MANAGE_SPACE, CACHE_ONLY_EXCLUDE) != null) {
+                if (find(root, CACHE_LABELS, null) != null || find(root, MANAGE_SPACE, CACHE_ONLY_EXCLUDE) != null) {
                     setStep(CLEAR_CACHE);
                     scheduleTick(300);
                     return;
@@ -183,7 +183,7 @@ public class FbClearService extends AccessibilityService {
             }
             case CLEAR_CACHE: {
                 if (!cacheClicked) {
-                    AccessibilityNodeInfo c = find(root, CLEAR_CACHE, null);
+                    AccessibilityNodeInfo c = find(root, CACHE_LABELS, null);
                     if (c != null) { click(c); cacheClicked = true; scheduleTick(900); return; }
                 }
                 setStep(MANAGE);
