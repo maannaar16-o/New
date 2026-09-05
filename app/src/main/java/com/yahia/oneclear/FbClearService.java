@@ -1,7 +1,10 @@
 package com.yahia.oneclear;
 
 import android.accessibilityservice.AccessibilityService;
+import android.accessibilityservice.GestureDescription;
 import android.content.Intent;
+import android.graphics.Path;
+import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
@@ -13,18 +16,20 @@ import android.widget.Toast;
 import java.util.Locale;
 
 /**
- * Automates, on the user's own device and with their own taps, the steps to
- * wipe Facebook Lite's data:
+ * Automates, on the user's own device and with their own taps, wiping Facebook
+ * Lite's data:
  *   App info → (Storage) → Clear cache → Clear storage / Manage space →
  *   in Facebook Lite's Manage-Space screen:
- *     1) make sure "Clear all" (مسح الكل) is ticked (this ticks the caches),
- *     2) tick "Accounts and settings" (الحسابات والإعدادات) on its own — this
- *        pops a confirmation dialog,
- *     3) confirm that dialog,
- *     4) press the final Clear (مسح) and confirm.
+ *     1) ensure "Clear all" (مسح الكل) is ticked (ticks the caches),
+ *     2) tick "Accounts and settings" (الحسابات والإعدادات) — it is greyed as
+ *        "not recommended", so ACTION_CLICK is unreliable; we tap its real
+ *        screen coordinates instead. This raises a confirmation dialog,
+ *     3) press "موافق" in that dialog,
+ *     4) press the final Clear (مسح).
  *
- * Runs only while a user-started flow is active; stops on completion/timeout.
- * Button wording differs by device/language — tune the label arrays below.
+ * On the Facebook screen we use real gesture taps (dispatchGesture) because the
+ * custom list items don't reliably respond to ACTION_CLICK. Runs only while a
+ * user-started flow is active; stops on completion/timeout.
  */
 public class FbClearService extends AccessibilityService {
 
@@ -32,18 +37,17 @@ public class FbClearService extends AccessibilityService {
 
     public static final String FB_PKG = "com.facebook.lite";
 
-    // Steps
     private static final int IDLE = 0;
     private static final int GO_STORAGE = 1;
     private static final int CLEAR_CACHE = 2;
     private static final int MANAGE = 3;
-    private static final int FB_SELECT_ALL = 4;   // ensure "مسح الكل" ticked
-    private static final int FB_ACCOUNTS = 5;     // tick "الحسابات والإعدادات"
-    private static final int FB_ACCOUNTS_CONFIRM = 6; // confirm its dialog
-    private static final int FB_FINAL_CLEAR = 7;  // press "مسح"
-    private static final int FB_FINAL_CONFIRM = 8; // confirm final dialog
+    private static final int FB_SELECT_ALL = 4;
+    private static final int FB_ACCOUNTS = 5;
+    private static final int FB_ACCOUNTS_CONFIRM = 6;
+    private static final int FB_FINAL_CLEAR = 7;
+    private static final int FB_FINAL_CONFIRM = 8;
 
-    private static final long OVERALL_TIMEOUT_MS = 40000;
+    private static final long OVERALL_TIMEOUT_MS = 45000;
     private static final long STEP_TIMEOUT_MS = 9000;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -54,9 +58,9 @@ public class FbClearService extends AccessibilityService {
     private int tickToken = 0;
     private boolean cacheClicked = false;
     private boolean manageClicked = false;
-    private boolean accountsClicked = false;
     private boolean accountsConfirmed = false;
     private boolean finalClearClicked = false;
+    private int accountsTaps = 0;
     private int finalConfirmClicks = 0;
 
     // ===== Labels (lower-case). Arabic + English + variants. =====
@@ -75,34 +79,30 @@ public class FbClearService extends AccessibilityService {
             "إدارة المساحة", "إدارة مساحة التخزين", "إدارة التخزين",
             "مسح مساحة التخزين", "مسح البيانات", "مسح وحدة التخزين", "مسح كل البيانات"
     };
-    // The "Clear all" master checkbox inside FB's Manage-Space screen:
     private static final String[] SELECT_ALL = {
             "مسح الكل", "select all", "clear all", "تحديد الكل", "اختيار الكل"
     };
-    // The "Accounts and settings" row (must be ticked on its own):
     private static final String[] ACCOUNTS_SETTINGS = {
             "الحسابات والإعدادات", "الحسابات و الإعدادات",
             "accounts and settings", "accounts & settings"
     };
-    // Affirmative button in the dialog that appears after ticking accounts.
-    // (Deliberately excludes "مسح"/"clear" so it never grabs the Clear button early.)
+    // Affirmative in the "clear personal files and settings?" dialog (موافق).
     private static final String[] DIALOG_CONFIRM = {
-            "متابعة", "استمرار", "موافق", "نعم", "تأكيد", "تفعيل", "تحديد",
-            "continue", "ok", "okay", "yes", "enable", "confirm", "select"
+            "موافق", "متابعة", "استمرار", "نعم", "تأكيد", "تفعيل",
+            "ok", "okay", "continue", "yes", "enable", "confirm"
     };
-    // The final Clear button on the Manage-Space screen:
+    // The final blue Clear button (مسح) on the Manage-Space screen.
     private static final String[] FINAL_CLEAR = {
             "مسح البيانات", "clear data", "حذف البيانات", "مسح", "clear", "erase", "حذف"
     };
-    // The final "are you sure" dialog after pressing Clear:
+    // A possible final "are you sure" dialog (kept off the Clear button itself).
     private static final String[] FINAL_CONFIRM = {
-            "مسح", "حذف", "موافق", "نعم", "تأكيد", "متابعة",
-            "delete", "ok", "okay", "yes", "erase", "clear", "confirm"
+            "موافق", "نعم", "تأكيد", "متابعة", "حذف", "delete", "ok", "yes", "confirm"
     };
     private static final String[] CANCEL_EXCLUDE = {
             "cancel", "إلغاء", "الغاء", "later", "لا،", "رجوع", "back"
     };
-    // Keep the final-Clear search off the master checkbox, caches, accounts and header.
+    // Keep the final-Clear search off the master checkbox, caches, accounts, header.
     private static final String[] NOT_CLEAR_EXCLUDE = {
             "الكل", "all", "cache", "الذاكرة", "المؤقت", "المؤقتة",
             "الحسابات", "accounts", "وحدة التخزين", "على هاتفك",
@@ -134,7 +134,8 @@ public class FbClearService extends AccessibilityService {
     public void startFacebookLite() {
         running = true;
         step = GO_STORAGE;
-        cacheClicked = manageClicked = accountsClicked = accountsConfirmed = finalClearClicked = false;
+        cacheClicked = manageClicked = accountsConfirmed = finalClearClicked = false;
+        accountsTaps = 0;
         finalConfirmClicks = 0;
         startedAt = stepStartedAt = System.currentTimeMillis();
         openAppInfo(FB_PKG);
@@ -172,7 +173,7 @@ public class FbClearService extends AccessibilityService {
 
         long now = System.currentTimeMillis();
         if (now - startedAt > OVERALL_TIMEOUT_MS) {
-            finish("انتهى الوقت — بعض الخطوات قد تحتاج ضبط أسماء الأزرار");
+            finish("انتهى الوقت — بعض الخطوات قد تحتاج ضبط");
             return;
         }
         if (now - stepStartedAt > STEP_TIMEOUT_MS) {
@@ -216,52 +217,58 @@ public class FbClearService extends AccessibilityService {
             case MANAGE: {
                 if (!manageClicked) {
                     AccessibilityNodeInfo m = find(root, MANAGE_SPACE, CACHE_ONLY_EXCLUDE);
-                    if (m != null) { click(m); manageClicked = true; setStep(FB_SELECT_ALL); scheduleTick(1400); return; }
+                    if (m != null) { click(m); manageClicked = true; setStep(FB_SELECT_ALL); scheduleTick(1500); return; }
                 }
                 scheduleTick(500); return;
             }
             case FB_SELECT_ALL: {
                 if (!onFb) { scheduleTick(500); return; }
-                // Tick "Clear all" only if it exists and is not already checked.
                 AccessibilityNodeInfo sa = findCheckableByLabel(root, SELECT_ALL);
-                if (sa != null && !sa.isChecked()) {
-                    clickNode(sa);
-                    scheduleTick(700);
-                    return;
-                }
+                if (sa != null && !sa.isChecked()) { gestureTap(sa); scheduleTick(800); return; }
                 setStep(FB_ACCOUNTS); scheduleTick(500); return;
             }
             case FB_ACCOUNTS: {
                 if (!onFb) { scheduleTick(500); return; }
-                AccessibilityNodeInfo acc = findCheckableByLabel(root, ACCOUNTS_SETTINGS);
-                if (acc != null && acc.isChecked()) { setStep(FB_FINAL_CLEAR); scheduleTick(500); return; }
-                if (acc != null && !accountsClicked) {
-                    clickNode(acc);
-                    accountsClicked = true;
+                AccessibilityNodeInfo accBox = findCheckableByLabel(root, ACCOUNTS_SETTINGS);
+                if (accBox != null && accBox.isChecked()) { setStep(FB_FINAL_CLEAR); scheduleTick(500); return; }
+                // Tap the accounts row with a real gesture. Vary the target across
+                // retries: the checkbox, then the whole row, then the label.
+                AccessibilityNodeInfo target = null;
+                AccessibilityNodeInfo txt = findTextNode(root, ACCOUNTS_SETTINGS, null);
+                if (accountsTaps == 0 && accBox != null) target = accBox;
+                else if (txt != null) target = (accountsTaps == 1) ? rowOf(txt) : txt;
+                else target = accBox;
+                if (target != null) {
+                    gestureTap(target);
+                    accountsTaps++;
                     setStep(FB_ACCOUNTS_CONFIRM);
-                    scheduleTick(900);
+                    scheduleTick(1100);
                     return;
                 }
                 scheduleTick(500); return;
             }
             case FB_ACCOUNTS_CONFIRM: {
-                // A dialog appears after ticking accounts+settings; confirm it.
-                AccessibilityNodeInfo cf = find(root, DIALOG_CONFIRM, CANCEL_EXCLUDE);
-                if (cf != null && !accountsConfirmed) {
-                    click(cf); accountsConfirmed = true; setStep(FB_FINAL_CLEAR); scheduleTick(1000); return;
+                // Dialog "هل تريد مسح الملفات الشخصية والإعدادات" → tap موافق.
+                AccessibilityNodeInfo ok = findTextNode(root, DIALOG_CONFIRM, CANCEL_EXCLUDE);
+                if (ok != null) {
+                    gestureTap(ok); accountsConfirmed = true;
+                    setStep(FB_FINAL_CLEAR); scheduleTick(1300); return;
                 }
-                scheduleTick(500); return;
+                // No dialog appeared → the tap missed; retry the accounts tap.
+                if (accountsTaps < 5) { setStep(FB_ACCOUNTS); scheduleTick(700); return; }
+                setStep(FB_FINAL_CLEAR); scheduleTick(700); return;
             }
             case FB_FINAL_CLEAR: {
-                AccessibilityNodeInfo clr = find(root, FINAL_CLEAR, NOT_CLEAR_EXCLUDE);
+                AccessibilityNodeInfo clr = findTextNode(root, FINAL_CLEAR, NOT_CLEAR_EXCLUDE);
                 if (clr != null && !finalClearClicked) {
-                    click(clr); finalClearClicked = true; setStep(FB_FINAL_CONFIRM); scheduleTick(1000); return;
+                    gestureTap(clr); finalClearClicked = true;
+                    setStep(FB_FINAL_CONFIRM); scheduleTick(1300); return;
                 }
                 scheduleTick(500); return;
             }
             case FB_FINAL_CONFIRM: {
-                AccessibilityNodeInfo cf = find(root, FINAL_CONFIRM, NOT_CLEAR_EXCLUDE);
-                if (cf != null) { click(cf); finalConfirmClicks++; scheduleTick(900); return; }
+                AccessibilityNodeInfo cf = findTextNode(root, FINAL_CONFIRM, CANCEL_EXCLUDE);
+                if (cf != null) { gestureTap(cf); finalConfirmClicks++; scheduleTick(900); return; }
                 if (finalConfirmClicks >= 1) { finish("تم مسح بيانات فيسبوك لايت ✔"); return; }
                 scheduleTick(500); return;
             }
@@ -280,15 +287,34 @@ public class FbClearService extends AccessibilityService {
         });
     }
 
-    // ---- node helpers ----
+    // ---- gesture (real coordinate tap) ----
 
-    /** First clickable node whose text/desc matches one of labels (respecting excludes). */
+    private void gestureTap(AccessibilityNodeInfo n) {
+        if (n == null) return;
+        Rect r = new Rect();
+        n.getBoundsInScreen(r);
+        if (r.width() <= 0 || r.height() <= 0) return;
+        Path path = new Path();
+        path.moveTo(r.exactCenterX(), r.exactCenterY());
+        try {
+            GestureDescription.StrokeDescription stroke =
+                    new GestureDescription.StrokeDescription(path, 0L, 60L);
+            dispatchGesture(new GestureDescription.Builder().addStroke(stroke).build(), null, null);
+        } catch (Exception ignored) {}
+    }
+
+    private AccessibilityNodeInfo rowOf(AccessibilityNodeInfo n) {
+        AccessibilityNodeInfo p = (n == null) ? null : n.getParent();
+        return p != null ? p : n;
+    }
+
+    // ---- node search ----
+
     private AccessibilityNodeInfo find(AccessibilityNodeInfo node, String[] labels, String[] excludes) {
         AccessibilityNodeInfo t = findTextNode(node, labels, excludes);
         return t == null ? null : clickableSelfOrAncestor(t);
     }
 
-    /** First raw node whose text/desc matches (no clickable requirement). */
     private AccessibilityNodeInfo findTextNode(AccessibilityNodeInfo node, String[] labels, String[] excludes) {
         if (node == null) return null;
         CharSequence tx = node.getText();
@@ -304,7 +330,6 @@ public class FbClearService extends AccessibilityService {
         return null;
     }
 
-    /** The checkbox associated with a labelled row. */
     private AccessibilityNodeInfo findCheckableByLabel(AccessibilityNodeInfo root, String[] labels) {
         AccessibilityNodeInfo textNode = findTextNode(root, labels, null);
         if (textNode == null) return null;
@@ -349,14 +374,6 @@ public class FbClearService extends AccessibilityService {
             cur = cur.getParent();
         }
         return null;
-    }
-
-    /** Click a (possibly non-clickable) checkable node via its clickable ancestor. */
-    private boolean clickNode(AccessibilityNodeInfo n) {
-        if (n == null) return false;
-        AccessibilityNodeInfo c = clickableSelfOrAncestor(n);
-        if (c == null) c = n;
-        return c.performAction(AccessibilityNodeInfo.ACTION_CLICK);
     }
 
     private boolean click(AccessibilityNodeInfo n) {
