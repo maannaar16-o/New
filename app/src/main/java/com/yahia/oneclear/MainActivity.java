@@ -12,11 +12,13 @@ import android.graphics.Typeface;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -26,14 +28,18 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * One screen, one button. Tapping "امسح الآن" wipes the call log and every SMS,
- * then sends the user to the Accounts screen to remove accounts by hand
- * (accounts cannot be removed programmatically — see README_AR.md).
+ * Setup + manual-wipe screen. One-time setup here (permissions + default SMS
+ * app) enables the truly-silent one-tap widget. Wipes the call log and SMS,
+ * then points the user at the Accounts screen for manual account removal.
  */
 public class MainActivity extends Activity {
 
     private static final int REQ_PERMS = 101;
     private static final int REQ_DEFAULT_SMS = 102;
+
+    private static final int RED = 0xFFD32F2F;
+    private static final int TEXT = 0xFF1A1A1A;
+    private static final int SUBTLE = 0xFF5A5A66;
 
     private TextView statusView;
     private boolean wipeInProgress = false;
@@ -50,75 +56,146 @@ public class MainActivity extends Activity {
         super.onCreate(b);
 
         ScrollView scroll = new ScrollView(this);
+        scroll.setBackgroundColor(0xFFF4F5F7);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         int pad = dp(16);
         root.setPadding(pad, pad, pad, pad);
         scroll.addView(root);
 
-        root.addView(title("مسح بضغطة واحدة"));
-        root.addView(body("بضغطة واحدة يمسح هذا التطبيق:\n"
-                + "• كل سجل المكالمات\n"
-                + "• كل الرسائل النصية (SMS)\n"
-                + "ثم يفتح لك شاشة الحسابات لإزالتها بنفسك."));
-        root.addView(warn("⚠️ المسح نهائي ولا يمكن التراجع عنه. لا يمكن استرجاع المكالمات أو الرسائل بعد حذفها."));
+        // ---- Header ----
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setBackground(getDrawable(R.drawable.header_bg));
+        int hp = dp(18);
+        header.setPadding(hp, hp, hp, hp);
+        LinearLayout titleCol = new LinearLayout(this);
+        titleCol.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams tcp = new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        titleCol.setLayoutParams(tcp);
+        TextView h1 = new TextView(this);
+        h1.setText("مسح الرسائل والمكالمات");
+        h1.setTextColor(Color.WHITE);
+        h1.setTextSize(TypedValue.COMPLEX_UNIT_SP, 21);
+        h1.setTypeface(Typeface.DEFAULT_BOLD);
+        TextView h2 = new TextView(this);
+        h2.setText("امسح مكالماتك ورسائلك بضغطة واحدة");
+        h2.setTextColor(0xFFFFE0E0);
+        h2.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        h2.setPadding(0, dp(4), 0, 0);
+        titleCol.addView(h1);
+        titleCol.addView(h2);
+        ImageView broom = new ImageView(this);
+        broom.setImageDrawable(getDrawable(R.drawable.ic_broom));
+        broom.setColorFilter(Color.WHITE);
+        LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(dp(46), dp(46));
+        broom.setLayoutParams(ip);
+        header.addView(titleCol);
+        header.addView(broom);
+        root.addView(header);
+        root.addView(gap(dp(16)));
 
-        statusView = body("");
-        root.addView(statusView);
-
-        Button wipeBtn = button("امسح الآن");
+        // ---- Hero wipe button ----
+        Button wipeBtn = new Button(this);
+        wipeBtn.setText("امسح الآن");
+        wipeBtn.setAllCaps(false);
         wipeBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
+        wipeBtn.setTypeface(Typeface.DEFAULT_BOLD);
         wipeBtn.setTextColor(Color.WHITE);
-        wipeBtn.setBackgroundColor(0xFFC62828);
-        LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(64));
-        clp.topMargin = dp(14);
-        clp.bottomMargin = dp(10);
-        wipeBtn.setLayoutParams(clp);
+        wipeBtn.setBackground(getDrawable(R.drawable.btn_primary));
+        LinearLayout.LayoutParams hbp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(62));
+        wipeBtn.setLayoutParams(hbp);
         wipeBtn.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { startWipeWithConfirm(); }
         });
         root.addView(wipeBtn);
+        root.addView(gap(dp(10)));
 
+        // ---- Warning ----
+        TextView warn = new TextView(this);
+        warn.setText("⚠️ المسح نهائي ولا يمكن التراجع عنه.");
+        warn.setTextColor(RED);
+        warn.setTypeface(Typeface.DEFAULT_BOLD);
+        warn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        warn.setBackground(getDrawable(R.drawable.warn_bg));
+        int wp = dp(12);
+        warn.setPadding(wp, dp(10), wp, dp(10));
+        root.addView(warn);
+        root.addView(gap(dp(16)));
+
+        // ---- What it does ----
+        LinearLayout doCard = card();
+        doCard.addView(cardTitle("بيعمل إيه؟"));
+        doCard.addView(bullet("📞  يمسح كل سجل المكالمات"));
+        doCard.addView(bullet("💬  يمسح كل الرسائل النصية (SMS)"));
+        doCard.addView(bullet("👤  يفتح شاشة الحسابات لإزالتها بنفسك"));
+        root.addView(doCard);
+        root.addView(gap(dp(12)));
+
+        // ---- Status ----
+        LinearLayout statusCard = card();
+        statusCard.addView(cardTitle("الحالة"));
+        statusView = new TextView(this);
+        statusView.setTextColor(SUBTLE);
+        statusView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        statusView.setLineSpacing(dp(4), 1f);
+        statusCard.addView(statusView);
+        root.addView(statusCard);
+        root.addView(gap(dp(12)));
+
+        // ---- Options ----
+        LinearLayout optCard = card();
+        optCard.addView(cardTitle("الإعدادات"));
         final CheckBox confirmBox = new CheckBox(this);
         confirmBox.setText("اطلب تأكيد قبل المسح (للأمان)");
+        confirmBox.setTextColor(TEXT);
         confirmBox.setChecked(Prefs.isConfirmEnabled(this));
         confirmBox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             public void onCheckedChanged(CompoundButton bv, boolean checked) {
                 Prefs.setConfirmEnabled(MainActivity.this, checked);
             }
         });
-        root.addView(confirmBox);
-
+        optCard.addView(confirmBox);
         final CheckBox openAccountsBox = new CheckBox(this);
-        openAccountsBox.setText("افتح شاشة الحسابات بعد المسح (لإزالتها يدويًا)");
+        openAccountsBox.setText("افتح شاشة الحسابات بعد المسح");
+        openAccountsBox.setTextColor(TEXT);
         openAccountsBox.setChecked(Prefs.isOpenAccountsEnabled(this));
         openAccountsBox.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             public void onCheckedChanged(CompoundButton bv, boolean checked) {
                 Prefs.setOpenAccountsEnabled(MainActivity.this, checked);
             }
         });
-        root.addView(openAccountsBox);
+        optCard.addView(openAccountsBox);
+        root.addView(optCard);
+        root.addView(gap(dp(12)));
 
-        Button accountsBtn = button("فتح شاشة الحسابات (لإزالتها يدويًا)");
+        // ---- Secondary actions ----
+        Button accountsBtn = outlineButton("فتح شاشة الحسابات");
         accountsBtn.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { WipeFlow.openAccountsSettings(MainActivity.this); }
         });
-        root.addView(space(dp(6)));
         root.addView(accountsBtn);
-
-        Button restoreSmsBtn = button("استعادة تطبيق الرسائل العادي");
+        root.addView(gap(dp(8)));
+        Button restoreSmsBtn = outlineButton("استعادة تطبيق الرسائل العادي");
         restoreSmsBtn.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { WipeFlow.openDefaultSmsSettings(MainActivity.this); }
         });
         root.addView(restoreSmsBtn);
+        root.addView(gap(dp(16)));
 
-        root.addView(space(dp(12)));
-        root.addView(body("الضغطة الواحدة الحقيقية (بدون فتح التطبيق):\n"
-                + "1) اعمل الإعداد مرة واحدة هنا: اضغط «امسح الآن» واقبل الصلاحيات + اجعله «تطبيق الرسائل الافتراضي».\n"
-                + "2) اضغط مطوّلًا على الشاشة الرئيسية ← الودجتس (Widgets) ← اختر «مسح بضغطة واحدة» وضعه على الشاشة.\n"
-                + "بعدها أي ضغطة على الودجت تمسح المكالمات والرسائل في الخلفية فورًا، دون فتح التطبيق.\n"
-                + "لمسح فوري تمامًا بلا أي نافذة: أزل علامة «اطلب تأكيد قبل المسح»."));
+        // ---- Help ----
+        LinearLayout helpCard = card();
+        helpCard.addView(cardTitle("الضغطة الواحدة من الشاشة الرئيسية"));
+        helpCard.addView(bodyText(
+                "1) اعمل الإعداد مرة واحدة هنا: اضغط «امسح الآن» واقبل الصلاحيات + اجعله «تطبيق الرسائل الافتراضي».\n"
+                + "2) اضغط مطوّلًا على الشاشة الرئيسية ← الودجتس (Widgets) ← اختر «مسح الرسائل والمكالمات» وضعه على الشاشة.\n"
+                + "بعدها أي ضغطة على الودجت تمسح في الخلفية فورًا، دون فتح التطبيق.\n"
+                + "لمسح فوري بلا أي نافذة: أزل علامة «اطلب تأكيد قبل المسح».\n"
+                + "لا تنسَ استعادة تطبيق الرسائل العادي بعد الانتهاء."));
+        root.addView(helpCard);
 
         setContentView(scroll);
     }
@@ -128,11 +205,11 @@ public class MainActivity extends Activity {
         super.onResume();
         StringBuilder s = new StringBuilder();
         s.append(WipeFlow.isDefaultSms(this)
-                ? "• تطبيق الرسائل الافتراضي: هذا التطبيق (مؤقتًا للمسح)\n"
+                ? "✔ تطبيق الرسائل الافتراضي: هذا التطبيق (مؤقتًا للمسح)\n"
                 : "• تطبيق الرسائل الافتراضي: تطبيقك العادي\n");
         List<String> accts = WipeFlow.listAccounts(this);
         if (accts.isEmpty()) {
-            s.append("• الحسابات على الجهاز: (اضغط الزر لعرضها/إزالتها)");
+            s.append("• الحسابات على الجهاز: (اضغط «فتح شاشة الحسابات» لعرضها)");
         } else {
             s.append("• الحسابات على الجهاز (").append(accts.size()).append("): ");
             s.append(android.text.TextUtils.join("، ", accts));
@@ -140,7 +217,7 @@ public class MainActivity extends Activity {
         statusView.setText(s.toString());
     }
 
-    // ---- wipe orchestration ----
+    // ---- wipe orchestration (unchanged logic) ----
 
     private void startWipeWithConfirm() {
         if (wipeInProgress) return;
@@ -172,7 +249,6 @@ public class MainActivity extends Activity {
             performWipe();
             return;
         }
-        // Ask to become the default SMS app (required to delete SMS).
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 RoleManager rm = (RoleManager) getSystemService(ROLE_SERVICE);
@@ -184,7 +260,6 @@ public class MainActivity extends Activity {
                 startActivityForResult(i, REQ_DEFAULT_SMS);
             }
         } catch (Exception e) {
-            // Could not open the picker; wipe what we can.
             performWipe();
         }
     }
@@ -193,7 +268,6 @@ public class MainActivity extends Activity {
     public void onRequestPermissionsResult(int requestCode, String[] perms, int[] results) {
         super.onRequestPermissionsResult(requestCode, perms, results);
         if (requestCode == REQ_PERMS) {
-            // Proceed regardless: whatever was granted, wipe what we can.
             ensureDefaultSmsThenWipe();
         }
     }
@@ -208,7 +282,7 @@ public class MainActivity extends Activity {
 
     private void performWipe() {
         int calls = 0;
-        boolean callsOk = true;
+        boolean callsOk;
         if (hasPerm(Manifest.permission.WRITE_CALL_LOG)) {
             calls = WipeFlow.wipeCallLog(this);
             callsOk = calls >= 0;
@@ -271,44 +345,64 @@ public class MainActivity extends Activity {
         return miss.toArray(new String[0]);
     }
 
-    // ---- small UI helpers ----
+    // ---- UI helpers ----
+
     private int dp(int v) {
         return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v,
                 getResources().getDisplayMetrics());
     }
 
-    private TextView title(String t) {
+    private LinearLayout card() {
+        LinearLayout c = new LinearLayout(this);
+        c.setOrientation(LinearLayout.VERTICAL);
+        c.setBackground(getDrawable(R.drawable.card_bg));
+        int p = dp(16);
+        c.setPadding(p, p, p, p);
+        return c;
+    }
+
+    private TextView cardTitle(String t) {
         TextView tv = new TextView(this);
         tv.setText(t);
-        tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
+        tv.setTextColor(TEXT);
+        tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
         tv.setTypeface(Typeface.DEFAULT_BOLD);
         tv.setPadding(0, 0, 0, dp(8));
         return tv;
     }
 
-    private TextView body(String t) {
+    private TextView bullet(String t) {
         TextView tv = new TextView(this);
         tv.setText(t);
+        tv.setTextColor(0xFF333333);
         tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
-        tv.setPadding(0, dp(4), 0, dp(4));
+        tv.setPadding(0, dp(5), 0, dp(5));
         return tv;
     }
 
-    private TextView warn(String t) {
-        TextView tv = body(t);
-        tv.setTextColor(0xFFC62828);
-        tv.setTypeface(Typeface.DEFAULT_BOLD);
+    private TextView bodyText(String t) {
+        TextView tv = new TextView(this);
+        tv.setText(t);
+        tv.setTextColor(SUBTLE);
+        tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        tv.setLineSpacing(dp(4), 1f);
         return tv;
     }
 
-    private Button button(String t) {
+    private Button outlineButton(String t) {
         Button btn = new Button(this);
         btn.setText(t);
         btn.setAllCaps(false);
+        btn.setTextColor(RED);
+        btn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        btn.setBackground(getDrawable(R.drawable.btn_outline));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(52));
+        btn.setLayoutParams(lp);
         return btn;
     }
 
-    private View space(int h) {
+    private View gap(int h) {
         View v = new View(this);
         v.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, h));
         return v;
