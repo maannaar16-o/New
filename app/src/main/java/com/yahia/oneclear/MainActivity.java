@@ -186,6 +186,27 @@ public class MainActivity extends Activity {
         root.addView(restoreSmsBtn);
         root.addView(gap(dp(16)));
 
+        // ---- Facebook Lite auto-clear ----
+        LinearLayout fbCard = card();
+        fbCard.addView(cardTitle("مسح بيانات فيسبوك لايت (تلقائي)"));
+        fbCard.addView(bodyText(
+                "يفتح إعدادات فيسبوك لايت ويضغط بدلًا عنك: محو الذاكرة المؤقتة ← إدارة المساحة ← "
+                + "تحديد كل الخيارات (بما فيها الحسابات والإعدادات) ← تأكيد ← مسح.\n"
+                + "يتطلب تفعيل «خدمة الوصول» مرة واحدة. سيب الجهاز أثناء العمل."));
+        Button enableAccBtn = outlineButton("① تفعيل خدمة الوصول");
+        enableAccBtn.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { openAccessibilitySettings(); }
+        });
+        fbCard.addView(enableAccBtn);
+        fbCard.addView(gap(dp(8)));
+        Button startFbBtn = outlineButton("② ابدأ مسح فيسبوك لايت");
+        startFbBtn.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { startFacebookLiteClear(); }
+        });
+        fbCard.addView(startFbBtn);
+        root.addView(fbCard);
+        root.addView(gap(dp(16)));
+
         // ---- Help ----
         LinearLayout helpCard = card();
         helpCard.addView(cardTitle("الضغطة الواحدة من الشاشة الرئيسية"));
@@ -322,6 +343,63 @@ public class MainActivity extends Activity {
                 .show();
 
         Toast.makeText(this, "تم", Toast.LENGTH_SHORT).show();
+    }
+
+    // ---- Facebook Lite auto-clear ----
+
+    private void startFacebookLiteClear() {
+        if (!isFbLiteInstalled()) {
+            Toast.makeText(this, "فيسبوك لايت غير مثبّت على الجهاز.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("مسح بيانات فيسبوك لايت")
+                .setMessage("سيفتح التطبيق الإعدادات ويضغط تلقائيًا: محو الذاكرة المؤقتة ← إدارة المساحة ← "
+                        + "تحديد كل الخيارات ← مسح. هذا يحذف بيانات فيسبوك لايت ويسجّل خروجك نهائيًا.\n\nمتابعة؟")
+                .setPositiveButton("نعم، ابدأ", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) {
+                        if (!isAccessibilityOn() || FbClearService.instance == null) {
+                            Toast.makeText(MainActivity.this,
+                                    "فعّل «خدمة الوصول» لهذا التطبيق أولًا ثم أعد المحاولة.",
+                                    Toast.LENGTH_LONG).show();
+                            openAccessibilitySettings();
+                            return;
+                        }
+                        Toast.makeText(MainActivity.this, "جارٍ المسح… سيب الجهاز لحد ما يخلّص",
+                                Toast.LENGTH_SHORT).show();
+                        FbClearService.instance.startFacebookLite();
+                    }
+                })
+                .setNegativeButton("إلغاء", null)
+                .show();
+    }
+
+    private boolean isFbLiteInstalled() {
+        try {
+            getPackageManager().getPackageInfo(FbClearService.FB_PKG, 0);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean isAccessibilityOn() {
+        if (FbClearService.instance != null) return true;
+        try {
+            String flat = android.provider.Settings.Secure.getString(getContentResolver(),
+                    android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+            if (flat == null || flat.isEmpty()) return false;
+            String comp = getPackageName() + "/" + FbClearService.class.getName();
+            return flat.contains(comp);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private void openAccessibilitySettings() {
+        try {
+            startActivity(new Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS));
+        } catch (Exception ignored) {}
     }
 
     // ---- permission helpers ----
