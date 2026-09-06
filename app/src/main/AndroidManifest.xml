@@ -15,9 +15,10 @@
     <!-- List which accounts exist so we can show them before sending you to Settings -->
     <uses-permission android:name="android.permission.GET_ACCOUNTS" />
 
-    <!-- So we can check whether Facebook Lite is installed (Android 11+ visibility). -->
+    <!-- So we can check whether the Facebook apps are installed (Android 11+ visibility). -->
     <queries>
         <package android:name="com.facebook.lite" />
+        <package android:name="com.facebook.katana" />
     </queries>
 
     <application

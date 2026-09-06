@@ -37,6 +37,10 @@ public class FbClearService extends AccessibilityService {
     public static FbClearService instance;
 
     public static final String FB_PKG = "com.facebook.lite";
+    public static final String FB_APP = "com.facebook.katana";
+
+    /** The app whose data we are currently wiping (set when the flow starts). */
+    private volatile String targetPkg = FB_PKG;
 
     private static final int IDLE = 0;
     private static final int GO_STORAGE = 1;
@@ -133,7 +137,9 @@ public class FbClearService extends AccessibilityService {
     @Override
     public void onInterrupt() { }
 
-    public void startFacebookLite() {
+    /** Start the automated clear-data flow for the given app package. */
+    public void startFor(String pkg) {
+        targetPkg = (pkg == null || pkg.isEmpty()) ? FB_PKG : pkg;
         running = true;
         step = GO_STORAGE;
         cacheClicked = manageClicked = accountsConfirmed = finalClearClicked = false;
@@ -141,7 +147,7 @@ public class FbClearService extends AccessibilityService {
         finalClearScrolls = 0;
         finalConfirmClicks = 0;
         startedAt = stepStartedAt = System.currentTimeMillis();
-        openAppInfo(FB_PKG);
+        openAppInfo(targetPkg);
         scheduleTick(1000);
     }
 
@@ -188,7 +194,7 @@ public class FbClearService extends AccessibilityService {
                 case FB_ACCOUNTS: finish("تعذّر تحديد «الحسابات والإعدادات» — ابعت صورة الشاشة"); return;
                 case FB_ACCOUNTS_CONFIRM: setStep(FB_FINAL_CLEAR); break;
                 case FB_FINAL_CLEAR: finish("تعذّر إيجاد زر «مسح» النهائي — ابعت صورة الشاشة"); return;
-                case FB_FINAL_CONFIRM: finish("تم مسح بيانات فيسبوك لايت ✔"); return;
+                case FB_FINAL_CONFIRM: finish("تم مسح بيانات التطبيق ✔"); return;
                 default: finish("خلص"); return;
             }
         }
@@ -197,7 +203,7 @@ public class FbClearService extends AccessibilityService {
         if (root == null) { scheduleTick(500); return; }
 
         CharSequence pkg = root.getPackageName();
-        boolean onFb = pkg != null && FB_PKG.contentEquals(pkg);
+        boolean onFb = pkg != null && targetPkg != null && targetPkg.contentEquals(pkg);
 
         switch (step) {
             case GO_STORAGE: {
@@ -301,7 +307,7 @@ public class FbClearService extends AccessibilityService {
                 if (cf != null) { gestureTap(cf); finalConfirmClicks++; scheduleTick(900); return; }
                 // Most devices clear directly with no extra dialog; don't linger.
                 if (finalConfirmClicks >= 1 || (now - stepStartedAt) > 2500) {
-                    finish("تم مسح بيانات فيسبوك لايت ✔");
+                    finish("تم مسح بيانات التطبيق ✔");
                     return;
                 }
                 scheduleTick(500); return;

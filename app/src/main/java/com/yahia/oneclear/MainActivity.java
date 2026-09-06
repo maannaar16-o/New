@@ -188,9 +188,9 @@ public class MainActivity extends Activity {
 
         // ---- Facebook Lite auto-clear ----
         LinearLayout fbCard = card();
-        fbCard.addView(cardTitle("مسح بيانات فيسبوك لايت (تلقائي)"));
+        fbCard.addView(cardTitle("مسح بيانات فيسبوك (تلقائي)"));
         fbCard.addView(bodyText(
-                "يفتح إعدادات فيسبوك لايت ويضغط بدلًا عنك: محو الذاكرة المؤقتة ← إدارة المساحة ← "
+                "يفتح إعدادات التطبيق ويضغط بدلًا عنك: محو الذاكرة المؤقتة ← إدارة المساحة ← "
                 + "تحديد كل الخيارات (بما فيها الحسابات والإعدادات) ← تأكيد ← مسح.\n"
                 + "يتطلب تفعيل «خدمة الوصول» مرة واحدة. سيب الجهاز أثناء العمل."));
         Button enableAccBtn = outlineButton("① تفعيل خدمة الوصول");
@@ -199,11 +199,17 @@ public class MainActivity extends Activity {
         });
         fbCard.addView(enableAccBtn);
         fbCard.addView(gap(dp(8)));
-        Button startFbBtn = outlineButton("② ابدأ مسح فيسبوك لايت");
-        startFbBtn.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { startFacebookLiteClear(); }
+        Button startLiteBtn = outlineButton("② ابدأ مسح فيسبوك لايت");
+        startLiteBtn.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { startAutoClear(FbClearService.FB_PKG, "فيسبوك لايت"); }
         });
-        fbCard.addView(startFbBtn);
+        fbCard.addView(startLiteBtn);
+        fbCard.addView(gap(dp(8)));
+        Button startAppBtn = outlineButton("③ ابدأ مسح فيسبوك (العادي)");
+        startAppBtn.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { startAutoClear(FbClearService.FB_APP, "فيسبوك"); }
+        });
+        fbCard.addView(startAppBtn);
         root.addView(fbCard);
         root.addView(gap(dp(16)));
 
@@ -345,17 +351,17 @@ public class MainActivity extends Activity {
         Toast.makeText(this, "تم", Toast.LENGTH_SHORT).show();
     }
 
-    // ---- Facebook Lite auto-clear ----
+    // ---- Facebook auto-clear (works for Facebook Lite and the regular app) ----
 
-    private void startFacebookLiteClear() {
-        if (!isFbLiteInstalled()) {
-            Toast.makeText(this, "فيسبوك لايت غير مثبّت على الجهاز.", Toast.LENGTH_LONG).show();
+    private void startAutoClear(final String pkg, final String label) {
+        if (!isInstalled(pkg)) {
+            Toast.makeText(this, label + " غير مثبّت على الجهاز.", Toast.LENGTH_LONG).show();
             return;
         }
         new AlertDialog.Builder(this)
-                .setTitle("مسح بيانات فيسبوك لايت")
+                .setTitle("مسح بيانات " + label)
                 .setMessage("سيفتح التطبيق الإعدادات ويضغط تلقائيًا: محو الذاكرة المؤقتة ← إدارة المساحة ← "
-                        + "تحديد كل الخيارات ← مسح. هذا يحذف بيانات فيسبوك لايت ويسجّل خروجك نهائيًا.\n\nمتابعة؟")
+                        + "تحديد كل الخيارات ← مسح. هذا يحذف بيانات " + label + " ويسجّل خروجك نهائيًا.\n\nمتابعة؟")
                 .setPositiveButton("نعم، ابدأ", new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface d, int w) {
                         if (!isAccessibilityOn() || FbClearService.instance == null) {
@@ -367,16 +373,16 @@ public class MainActivity extends Activity {
                         }
                         Toast.makeText(MainActivity.this, "جارٍ المسح… سيب الجهاز لحد ما يخلّص",
                                 Toast.LENGTH_SHORT).show();
-                        FbClearService.instance.startFacebookLite();
+                        FbClearService.instance.startFor(pkg);
                     }
                 })
                 .setNegativeButton("إلغاء", null)
                 .show();
     }
 
-    private boolean isFbLiteInstalled() {
+    private boolean isInstalled(String pkg) {
         try {
-            getPackageManager().getPackageInfo(FbClearService.FB_PKG, 0);
+            getPackageManager().getPackageInfo(pkg, 0);
             return true;
         } catch (Exception e) {
             return false;
