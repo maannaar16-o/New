@@ -279,8 +279,15 @@ public class FbClearService extends AccessibilityService {
                         return;
                     }
                 }
-                // The "مسح" button is below the fold — scroll down to reveal it, then retry.
-                if (finalClearScrolls < 6) { finalClearScrolls++; scrollDown(); scheduleTick(1000); return; }
+                // The "مسح" button is below the fold (especially in Arabic) — scroll to
+                // reveal it. Use the native scroll action first (reliable over checkbox
+                // rows), falling back to a swipe gesture.
+                if (finalClearScrolls < 8) {
+                    finalClearScrolls++;
+                    if (!scrollForward(root)) scrollDown();
+                    scheduleTick(900);
+                    return;
+                }
                 scheduleTick(500);
                 return;
             }
@@ -338,6 +345,28 @@ public class FbClearService extends AccessibilityService {
     private AccessibilityNodeInfo rowOf(AccessibilityNodeInfo n) {
         AccessibilityNodeInfo p = (n == null) ? null : n.getParent();
         return p != null ? p : n;
+    }
+
+    /** Scroll the list down using the native accessibility scroll action. */
+    private boolean scrollForward(AccessibilityNodeInfo root) {
+        AccessibilityNodeInfo s = findScrollable(root);
+        if (s == null) return false;
+        try {
+            return s.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private AccessibilityNodeInfo findScrollable(AccessibilityNodeInfo node) {
+        if (node == null) return null;
+        if (node.isScrollable()) return node;
+        int n = node.getChildCount();
+        for (int i = 0; i < n; i++) {
+            AccessibilityNodeInfo r = findScrollable(node.getChild(i));
+            if (r != null) return r;
+        }
+        return null;
     }
 
     private void scrollDown() {
