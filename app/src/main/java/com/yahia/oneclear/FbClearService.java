@@ -85,7 +85,8 @@ public class FbClearService extends AccessibilityService {
     private static final String[] MANAGE_SPACE = {
             "manage space", "manage storage", "clear storage", "clear data", "clear all data",
             "إدارة المساحة", "إدارة مساحة التخزين", "إدارة التخزين",
-            "مسح مساحة التخزين", "مسح البيانات", "مسح وحدة التخزين", "مسح كل البيانات"
+            "مسح مساحة التخزين", "مسح البيانات", "مسح وحدة التخزين", "مسح كل البيانات",
+            "محو مساحة التخزين", "محو مساحة", "محو التخزين", "محو وحدة التخزين", "محو البيانات"
     };
     private static final String[] SELECT_ALL = {
             "مسح الكل", "select all", "clear all", "تحديد الكل", "اختيار الكل"
@@ -101,9 +102,14 @@ public class FbClearService extends AccessibilityService {
             "مسح بيانات التطبيق", "delete app data", "clear app data",
             "delete this app's data", "clear this app's data"
     };
-    // … and confirm it with its Delete/OK button.
+    // … and confirm it with its Delete/OK button (FB: حذف, Messenger: حسنًا).
     private static final String[] SYS_DELETE_OK = {
-            "حذف", "موافق", "نعم", "delete", "ok", "okay", "yes"
+            "حذف", "حسنًا", "حسناً", "حسنا", "موافق", "نعم", "تأكيد", "متابعة",
+            "delete", "ok", "okay", "yes", "confirm", "continue"
+    };
+    // A dialog is recognizable by having a Cancel button.
+    private static final String[] CANCEL_ONLY = {
+            "إلغاء", "الغاء", "cancel"
     };
 
     // Affirmative in the "clear personal files and settings?" dialog (موافق).
@@ -248,9 +254,12 @@ public class FbClearService extends AccessibilityService {
                 // Regular Facebook (and any app without a Manage-Space screen) shows the
                 // system "delete app data?" dialog instead of the checkbox list. Just
                 // confirm it with its Delete button.
-                if (findTextNode(root, SYS_DELETE_TITLE, null) != null) {
-                    // Tap the real Delete BUTTON, not the title (which also contains "حذف").
-                    AccessibilityNodeInfo ok = find(root, SYS_DELETE_OK, CANCEL_EXCLUDE);
+                // Apps without a checkbox screen (Facebook, Messenger) show a confirm
+                // dialog right after "Clear/Erase storage" — recognizable by its Cancel
+                // button. Tap its affirmative (حذف / حسنًا / موافق), never the title.
+                if (findTextNode(root, SYS_DELETE_TITLE, null) != null
+                        || find(root, CANCEL_ONLY, null) != null) {
+                    AccessibilityNodeInfo ok = find(root, SYS_DELETE_OK, CANCEL_ONLY);
                     if (ok != null) {
                         ok.performAction(AccessibilityNodeInfo.ACTION_CLICK);
                         gestureTap(ok);
