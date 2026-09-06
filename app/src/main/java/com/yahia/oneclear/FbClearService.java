@@ -92,6 +92,18 @@ public class FbClearService extends AccessibilityService {
             "الحسابات والإعدادات", "الحسابات و الإعدادات",
             "accounts and settings", "accounts & settings"
     };
+    // The regular Facebook app has no checkbox screen — tapping Clear shows the
+    // system "delete app data?" dialog. Detect it by its title/message …
+    private static final String[] SYS_DELETE_TITLE = {
+            "حذف بيانات التطبيق", "هل تريد حذف بيانات", "حذف بيانات هذا التطبيق",
+            "مسح بيانات التطبيق", "delete app data", "clear app data",
+            "delete this app's data", "clear this app's data"
+    };
+    // … and confirm it with its Delete/OK button.
+    private static final String[] SYS_DELETE_OK = {
+            "حذف", "موافق", "نعم", "delete", "ok", "okay", "yes"
+    };
+
     // Affirmative in the "clear personal files and settings?" dialog (موافق).
     private static final String[] DIALOG_CONFIRM = {
             "موافق", "متابعة", "استمرار", "نعم", "تأكيد", "تفعيل",
@@ -231,6 +243,22 @@ public class FbClearService extends AccessibilityService {
                 scheduleTick(500); return;
             }
             case FB_SELECT_ALL: {
+                // Regular Facebook (and any app without a Manage-Space screen) shows the
+                // system "delete app data?" dialog instead of the checkbox list. Just
+                // confirm it with its Delete button.
+                if (findTextNode(root, SYS_DELETE_TITLE, null) != null) {
+                    AccessibilityNodeInfo ok = findTextNode(root, SYS_DELETE_OK, CANCEL_EXCLUDE);
+                    if (ok != null) {
+                        gestureTap(ok);
+                        AccessibilityNodeInfo c = clickableSelfOrAncestor(ok);
+                        if (c != null) c.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                        finalClearClicked = true;
+                        setStep(FB_FINAL_CONFIRM);
+                        scheduleTick(1300);
+                        return;
+                    }
+                    scheduleTick(500); return;
+                }
                 if (!onFb) { scheduleTick(500); return; }
                 AccessibilityNodeInfo sa = findCheckableByLabel(root, SELECT_ALL);
                 if (sa != null && !sa.isChecked()) { gestureTap(sa); scheduleTick(800); return; }
