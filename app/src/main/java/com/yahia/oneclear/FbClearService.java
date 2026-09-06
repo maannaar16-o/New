@@ -247,11 +247,11 @@ public class FbClearService extends AccessibilityService {
                 // system "delete app data?" dialog instead of the checkbox list. Just
                 // confirm it with its Delete button.
                 if (findTextNode(root, SYS_DELETE_TITLE, null) != null) {
-                    AccessibilityNodeInfo ok = findTextNode(root, SYS_DELETE_OK, CANCEL_EXCLUDE);
+                    // Tap the real Delete BUTTON, not the title (which also contains "حذف").
+                    AccessibilityNodeInfo ok = find(root, SYS_DELETE_OK, CANCEL_EXCLUDE);
                     if (ok != null) {
+                        ok.performAction(AccessibilityNodeInfo.ACTION_CLICK);
                         gestureTap(ok);
-                        AccessibilityNodeInfo c = clickableSelfOrAncestor(ok);
-                        if (c != null) c.performAction(AccessibilityNodeInfo.ACTION_CLICK);
                         finalClearClicked = true;
                         setStep(FB_FINAL_CONFIRM);
                         scheduleTick(1300);
@@ -485,9 +485,28 @@ public class FbClearService extends AccessibilityService {
 
     // ---- node search ----
 
+    /**
+     * First node that matches (labels, excludes) AND is (or is inside) a clickable
+     * element — returning that clickable. Non-clickable matches such as a dialog
+     * title that merely contains the word are skipped, so we don't tap the title
+     * instead of the button below it.
+     */
     private AccessibilityNodeInfo find(AccessibilityNodeInfo node, String[] labels, String[] excludes) {
-        AccessibilityNodeInfo t = findTextNode(node, labels, excludes);
-        return t == null ? null : clickableSelfOrAncestor(t);
+        if (node == null) return null;
+        CharSequence tx = node.getText();
+        CharSequence d = node.getContentDescription();
+        String hay = ((tx == null ? "" : tx) + " " + (d == null ? "" : d))
+                .toLowerCase(Locale.ROOT).trim();
+        if (!hay.isEmpty() && matches(hay, labels, excludes)) {
+            AccessibilityNodeInfo c = clickableSelfOrAncestor(node);
+            if (c != null) return c;
+        }
+        int n = node.getChildCount();
+        for (int i = 0; i < n; i++) {
+            AccessibilityNodeInfo r = find(node.getChild(i), labels, excludes);
+            if (r != null) return r;
+        }
+        return null;
     }
 
     private AccessibilityNodeInfo findTextNode(AccessibilityNodeInfo node, String[] labels, String[] excludes) {
