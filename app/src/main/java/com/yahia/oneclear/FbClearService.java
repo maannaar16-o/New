@@ -264,31 +264,36 @@ public class FbClearService extends AccessibilityService {
             case FB_FINAL_CLEAR: {
                 if (finalClearClicked) { setStep(FB_FINAL_CONFIRM); scheduleTick(600); return; }
                 DisplayMetrics dm = getResources().getDisplayMetrics();
+                // Phase 1: scroll to the bottom. Facebook Lite draws its own UI, so in
+                // Arabic the "مسح" button sits below the fold and there is no scrollable
+                // node — a few strong swipes bring it into view.
+                if (finalClearScrolls < 3) {
+                    finalClearScrolls++;
+                    if (!scrollForward(root)) scrollDown();
+                    scheduleTick(850);
+                    return;
+                }
+                // Phase 2: tap Clear. Prefer a real on-screen button node; otherwise tap
+                // the fixed bottom-centre where the full-width Clear bar always sits
+                // (its text isn't exposed to accessibility on FB Lite).
                 AccessibilityNodeInfo btn = findActionButton(root, dm.widthPixels, dm.heightPixels);
+                boolean tapped = false;
                 if (btn != null) {
                     Rect r = new Rect();
                     btn.getBoundsInScreen(r);
-                    boolean onScreen = r.centerY() > 0 && r.centerY() < dm.heightPixels;
-                    if (onScreen) {
+                    if (r.centerY() > 0 && r.centerY() < dm.heightPixels) {
                         gestureTap(btn);
                         AccessibilityNodeInfo c = clickableSelfOrAncestor(btn);
                         if (c != null) c.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                        finalClearClicked = true;
-                        setStep(FB_FINAL_CONFIRM);
-                        scheduleTick(1400);
-                        return;
+                        tapped = true;
                     }
                 }
-                // The "مسح" button is below the fold (especially in Arabic) — scroll to
-                // reveal it. Use the native scroll action first (reliable over checkbox
-                // rows), falling back to a swipe gesture.
-                if (finalClearScrolls < 8) {
-                    finalClearScrolls++;
-                    if (!scrollForward(root)) scrollDown();
-                    scheduleTick(900);
-                    return;
+                if (!tapped) {
+                    tapXY(dm.widthPixels * 0.5f, dm.heightPixels * 0.88f);
                 }
-                scheduleTick(500);
+                finalClearClicked = true;
+                setStep(FB_FINAL_CONFIRM);
+                scheduleTick(1500);
                 return;
             }
             case FB_FINAL_CONFIRM: {
@@ -372,14 +377,25 @@ public class FbClearService extends AccessibilityService {
     private void scrollDown() {
         DisplayMetrics dm = getResources().getDisplayMetrics();
         int x = dm.widthPixels / 2;
-        int y1 = (int) (dm.heightPixels * 0.72f);
-        int y2 = (int) (dm.heightPixels * 0.28f);
+        int y1 = (int) (dm.heightPixels * 0.82f);
+        int y2 = (int) (dm.heightPixels * 0.18f);
         Path p = new Path();
         p.moveTo(x, y1);
         p.lineTo(x, y2);
         try {
             GestureDescription.StrokeDescription stroke =
-                    new GestureDescription.StrokeDescription(p, 0L, 260L);
+                    new GestureDescription.StrokeDescription(p, 0L, 320L);
+            dispatchGesture(new GestureDescription.Builder().addStroke(stroke).build(), null, null);
+        } catch (Exception ignored) {}
+    }
+
+    /** A real coordinate tap at (x, y) — used when the target has no tappable node. */
+    private void tapXY(float x, float y) {
+        Path p = new Path();
+        p.moveTo(x, y);
+        try {
+            GestureDescription.StrokeDescription stroke =
+                    new GestureDescription.StrokeDescription(p, 0L, 60L);
             dispatchGesture(new GestureDescription.Builder().addStroke(stroke).build(), null, null);
         } catch (Exception ignored) {}
     }
