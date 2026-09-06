@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#2e7d55">
+  <meta name="description" content="تطبيق بطل — مساعد تغذية فارس اليومي">
+  <title>بطل — تغذية فارس</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="app-header">
+    <div class="app-header-inner">
+      <span class="app-logo">💪</span>
+      <div>
+        <h1 id="greeting">أهلًا بأم البطل</h1>
+        <p id="today-date" class="muted"></p>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+
+    <!-- ============ الرئيسية ============ -->
+    <section id="screen-home" class="screen active" aria-label="الرئيسية">
+      <div class="card motivation-card">
+        <p id="motivation-msg"></p>
+      </div>
+
+      <h2 class="section-title">يوم فارس حتى الآن</h2>
+      <div class="card">
+        <div id="home-rings" class="rings-row"></div>
+        <button class="btn btn-primary btn-block" data-goto="log">➕ سجّلي وجبة جديدة</button>
+      </div>
+
+      <h2 class="section-title">شرب الماء 💧</h2>
+      <div class="card water-card">
+        <p class="muted">كل كوب يساعد فارس على الهضم ويحميه من الإمساك</p>
+        <div id="water-cups" class="water-cups" role="group" aria-label="أكواب الماء"></div>
+        <div class="water-actions">
+          <button id="water-minus" class="btn btn-ghost" aria-label="إنقاص كوب">➖</button>
+          <span id="water-count" class="water-count">0</span>
+          <button id="water-plus" class="btn btn-primary" aria-label="إضافة كوب">➕ كوب</button>
+        </div>
+      </div>
+
+      <div class="card tip-card">
+        <h3>💡 نصيحة اليوم</h3>
+        <p id="daily-tip"></p>
+      </div>
+    </section>
+
+    <!-- ============ الوجبات ============ -->
+    <section id="screen-log" class="screen" aria-label="تسجيل الوجبات">
+      <h2 class="section-title">وجبات اليوم</h2>
+
+      <div class="meal-tabs" id="meal-tabs" role="tablist">
+        <button class="meal-tab active" data-meal="breakfast" role="tab">🌅 فطار</button>
+        <button class="meal-tab" data-meal="lunch" role="tab">☀️ غدا</button>
+        <button class="meal-tab" data-meal="dinner" role="tab">🌙 عشا</button>
+        <button class="meal-tab" data-meal="snack" role="tab">🍎 سناك</button>
+      </div>
+
+      <div class="card">
+        <div id="meal-items" class="meal-items"></div>
+        <div id="meal-totals" class="meal-totals"></div>
+        <button id="add-food-btn" class="btn btn-primary btn-block">➕ أضيفي صنف</button>
+      </div>
+
+      <h2 class="section-title">إجمالي اليوم كله</h2>
+      <div class="card">
+        <div id="day-totals" class="day-totals"></div>
+      </div>
+    </section>
+
+    <!-- ============ التقييم ============ -->
+    <section id="screen-review" class="screen" aria-label="تقييم اليوم">
+      <h2 class="section-title">تقييم تغذية فارس اليوم</h2>
+      <div class="card" id="review-summary"></div>
+      <div id="review-bars"></div>
+      <div id="review-suggestions"></div>
+    </section>
+
+    <!-- ============ السجل الأسبوعي ============ -->
+    <section id="screen-week" class="screen" aria-label="السجل الأسبوعي">
+      <h2 class="section-title">آخر ٧ أيام</h2>
+      <div class="card" id="week-summary"></div>
+      <div id="week-days"></div>
+    </section>
+
+    <!-- ============ معلومات ============ -->
+    <section id="screen-info" class="screen" aria-label="معلومات غذائية">
+      <h2 class="section-title">معلومات تفيد أم البطل</h2>
+      <div id="info-cards"></div>
+      <div class="card disclaimer">
+        <p>⚠️ المعلومات هنا استرشادية عامة ولا تغني عن استشارة طبيب فارس أو أخصائي التغذية المتابع لحالته.</p>
+      </div>
+    </section>
+
+    <!-- ============ الإعدادات ============ -->
+    <section id="screen-settings" class="screen" aria-label="الإعدادات">
+      <h2 class="section-title">الأهداف الغذائية اليومية</h2>
+      <div class="card">
+        <p class="muted">هذه قيم استرشادية مناسبة لطفل ١٢ سنة محدود الحركة — عدّليها حسب توصية طبيب فارس أو أخصائي التغذية.</p>
+        <form id="targets-form"></form>
+        <button id="save-targets" class="btn btn-primary btn-block">💾 حفظ الأهداف</button>
+        <button id="reset-targets" class="btn btn-ghost btn-block">↩️ استعادة القيم الافتراضية</button>
+      </div>
+
+      <h2 class="section-title">بيانات اليوم</h2>
+      <div class="card">
+        <button id="clear-today" class="btn btn-danger btn-block">🗑️ مسح بيانات اليوم الحالي</button>
+      </div>
+
+      <div class="card disclaimer">
+        <p>هذا التطبيق أداة مساعدة للأسرة ولا يغني عن المتابعة الطبية. بياناتكم محفوظة على هاتفكم فقط ولا تُرسل لأي جهة.</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- شريط التنقل السفلي -->
+  <nav class="bottom-nav" aria-label="التنقل">
+    <button class="nav-btn active" data-screen="home"><span class="nav-icon">🏠</span><span>الرئيسية</span></button>
+    <button class="nav-btn" data-screen="log"><span class="nav-icon">🍽️</span><span>الوجبات</span></button>
+    <button class="nav-btn" data-screen="review"><span class="nav-icon">📊</span><span>التقييم</span></button>
+    <button class="nav-btn" data-screen="week"><span class="nav-icon">📅</span><span>الأسبوع</span></button>
+    <button class="nav-btn" data-screen="info"><span class="nav-icon">📚</span><span>معلومات</span></button>
+    <button class="nav-btn" data-screen="settings"><span class="nav-icon">⚙️</span><span>إعدادات</span></button>
+  </nav>
+
+  <!-- نافذة اختيار صنف -->
+  <div id="food-modal" class="modal" hidden>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="food-modal-title">أضيفي صنف</h3>
+        <button id="food-modal-close" class="btn-close" aria-label="إغلاق">✕</button>
+      </div>
+
+      <div id="food-picker-step">
+        <input type="search" id="food-search" placeholder="🔍 ابحثي عن صنف..." autocomplete="off">
+        <div id="food-cat-chips" class="cat-chips"></div>
+        <ul id="food-list" class="food-list"></ul>
+      </div>
+
+      <div id="food-qty-step" hidden>
+        <p id="qty-food-name" class="qty-food-name"></p>
+        <label class="field-label" for="qty-unit">الوحدة</label>
+        <select id="qty-unit"></select>
+        <label class="field-label" for="qty-amount">الكمية</label>
+        <div class="qty-row">
+          <button id="qty-minus" class="btn btn-ghost" type="button">➖</button>
+          <input type="number" id="qty-amount" value="1" min="0.25" step="0.25" inputmode="decimal">
+          <button id="qty-plus" class="btn btn-ghost" type="button">➕</button>
+        </div>
+        <p id="qty-preview" class="qty-preview"></p>
+        <button id="qty-confirm" class="btn btn-primary btn-block">✅ إضافة للوجبة</button>
+        <button id="qty-back" class="btn btn-ghost btn-block">↩️ رجوع للقائمة</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="js/foods.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
