@@ -216,6 +216,12 @@ public class MainActivity extends Activity {
             public void onClick(View v) { startAutoClear(FbClearService.IG_LITE, "إنستجرام لايت"); }
         });
         fbCard.addView(startIgLiteBtn);
+        fbCard.addView(gap(dp(8)));
+        Button startMessengerBtn = outlineButton("⑤ ابدأ مسح ماسنجر");
+        startMessengerBtn.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { startAutoClear(FbClearService.MESSENGER, "ماسنجر"); }
+        });
+        fbCard.addView(startMessengerBtn);
         root.addView(fbCard);
         root.addView(gap(dp(16)));
 
