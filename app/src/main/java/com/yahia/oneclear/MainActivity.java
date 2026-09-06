@@ -188,7 +188,7 @@ public class MainActivity extends Activity {
 
         // ---- Facebook Lite auto-clear ----
         LinearLayout fbCard = card();
-        fbCard.addView(cardTitle("مسح بيانات فيسبوك (تلقائي)"));
+        fbCard.addView(cardTitle("مسح بيانات فيسبوك وإنستجرام (تلقائي)"));
         fbCard.addView(bodyText(
                 "يفتح إعدادات التطبيق ويضغط بدلًا عنك: محو الذاكرة المؤقتة ← إدارة المساحة ← "
                 + "تحديد كل الخيارات (بما فيها الحسابات والإعدادات) ← تأكيد ← مسح.\n"
@@ -210,6 +210,12 @@ public class MainActivity extends Activity {
             public void onClick(View v) { startAutoClear(FbClearService.FB_APP, "فيسبوك"); }
         });
         fbCard.addView(startAppBtn);
+        fbCard.addView(gap(dp(8)));
+        Button startIgLiteBtn = outlineButton("④ ابدأ مسح إنستجرام لايت");
+        startIgLiteBtn.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { startAutoClear(FbClearService.IG_LITE, "إنستجرام لايت"); }
+        });
+        fbCard.addView(startIgLiteBtn);
         root.addView(fbCard);
         root.addView(gap(dp(16)));
 

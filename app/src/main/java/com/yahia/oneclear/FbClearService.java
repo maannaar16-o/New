@@ -38,6 +38,7 @@ public class FbClearService extends AccessibilityService {
 
     public static final String FB_PKG = "com.facebook.lite";
     public static final String FB_APP = "com.facebook.katana";
+    public static final String IG_LITE = "com.instagram.lite";
 
     /** The app whose data we are currently wiping (set when the flow starts). */
     private volatile String targetPkg = FB_PKG;
