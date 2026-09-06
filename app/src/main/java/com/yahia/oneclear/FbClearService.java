@@ -287,7 +287,11 @@ public class FbClearService extends AccessibilityService {
             case FB_FINAL_CONFIRM: {
                 AccessibilityNodeInfo cf = findTextNode(root, FINAL_CONFIRM, CANCEL_EXCLUDE);
                 if (cf != null) { gestureTap(cf); finalConfirmClicks++; scheduleTick(900); return; }
-                if (finalConfirmClicks >= 1) { finish("تم مسح بيانات فيسبوك لايت ✔"); return; }
+                // Most devices clear directly with no extra dialog; don't linger.
+                if (finalConfirmClicks >= 1 || (now - stepStartedAt) > 2500) {
+                    finish("تم مسح بيانات فيسبوك لايت ✔");
+                    return;
+                }
                 scheduleTick(500); return;
             }
             default:
@@ -301,8 +305,18 @@ public class FbClearService extends AccessibilityService {
         handler.post(new Runnable() {
             @Override public void run() {
                 Toast.makeText(FbClearService.this, msg, Toast.LENGTH_LONG).show();
+                returnToApp();
             }
         });
+    }
+
+    /** Bring our own app back to the front after the flow ends. */
+    private void returnToApp() {
+        try {
+            Intent i = new Intent(FbClearService.this, MainActivity.class);
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+            startActivity(i);
+        } catch (Exception ignored) {}
     }
 
     // ---- gesture (real coordinate tap) ----
