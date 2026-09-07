@@ -37,9 +37,18 @@ jobs:
       - name: Prepare signing keystore
         env:
           KEYSTORE_B64: ${{ secrets.BATAL_KEYSTORE_B64 }}
+          KEYSTORE_PASS: ${{ secrets.BATAL_KEYSTORE_PASS || 'batal2026faris' }}
         run: |
           if [ -n "$KEYSTORE_B64" ]; then
-            echo "$KEYSTORE_B64" | base64 -d > android/app/batal.keystore
+            # إزالة أي مسافات/أسطر تسللت أثناء اللصق ثم فك الترميز
+            if ! printf '%s' "$KEYSTORE_B64" | tr -d '[:space:]' | base64 -d > android/app/batal.keystore 2>/dev/null; then
+              echo "::error::قيمة السر BATAL_KEYSTORE_B64 ليست base64 صالحًا — أعد لصق محتوى ملف batal-keystore-base64.txt كاملًا"
+              exit 1
+            fi
+            if ! keytool -list -keystore android/app/batal.keystore -storepass "$KEYSTORE_PASS" -alias batal > /dev/null 2>&1; then
+              echo "::error::المفتاح بعد فك الترميز تالف أو ناقص (أو كلمة المرور خاطئة) — أعد لصق قيمة السر BATAL_KEYSTORE_B64 كاملة من أولها لآخرها"
+              exit 1
+            fi
             echo "Using keystore from repository secret (stable signature)."
           else
             keytool -genkeypair -keystore android/app/batal.keystore -alias batal \
