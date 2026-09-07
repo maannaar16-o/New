@@ -1,0 +1,56 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.faris.batal'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.faris.batal"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    // كلمة المرور تأتي من سر BATAL_KEYSTORE_PASS في GitHub Actions إن وُجد،
+    // وإلا تُستخدم القيمة الافتراضية مع مفتاح مؤقت يولده الـ workflow
+    def keystorePass = System.getenv("BATAL_KEYSTORE_PASS") ?: "batal2026faris"
+    signingConfigs {
+        release {
+            storeFile file("batal.keystore")
+            storePassword keystorePass
+            keyAlias "batal"
+            keyPassword keystorePass
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.11.0'
+}
+
+// نسخ ملفات تطبيق الويب من جذر المستودع إلى assets عند كل بناء
+// حتى يبقى الـ APK دائمًا نسخة مطابقة لنسخة الويب
+tasks.register('copyWebAssets', Copy) {
+    def repoRoot = rootProject.projectDir.parentFile
+    from(repoRoot) {
+        include 'index.html', 'manifest.webmanifest', 'sw.js'
+        include 'css/**', 'js/**', 'icons/**'
+    }
+    into layout.projectDirectory.dir('src/main/assets')
+}
+preBuild.dependsOn copyWebAssets
