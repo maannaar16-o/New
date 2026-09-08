@@ -36,22 +36,31 @@ jobs:
 
       - name: Prepare signing keystore
         env:
-          KEYSTORE_B64: ${{ secrets.BATAL_KEYSTORE_B64 }}
+          KEY_PASSPHRASE: ${{ secrets.BATAL_KEY_PASSPHRASE }}
         run: |
-          if [ -n "$KEYSTORE_B64" ]; then
-            echo "$KEYSTORE_B64" | base64 -d > android/app/batal.keystore
-            echo "Using keystore from repository secret (stable signature)."
+          if [ -n "$KEY_PASSPHRASE" ]; then
+            # فك تشفير المفتاح الثابت المخزن في المستودع
+            if ! openssl enc -d -aes-256-cbc -pbkdf2 \
+                -in android/app/batal.keystore.enc \
+                -out android/app/batal.keystore \
+                -pass env:KEY_PASSPHRASE 2>/dev/null; then
+              echo "::error::كلمة فك التشفير في السر BATAL_KEY_PASSPHRASE غير صحيحة — تأكد من نسخها كما هي بالضبط"
+              exit 1
+            fi
+            if ! keytool -list -keystore android/app/batal.keystore -storepass batal2026faris -alias batal > /dev/null 2>&1; then
+              echo "::error::فشل التحقق من المفتاح بعد فك التشفير — راجع قيمة السر BATAL_KEY_PASSPHRASE"
+              exit 1
+            fi
+            echo "Using decrypted repository keystore (stable signature)."
           else
             keytool -genkeypair -keystore android/app/batal.keystore -alias batal \
               -keyalg RSA -keysize 2048 -validity 10000 \
               -storepass batal2026faris -keypass batal2026faris \
               -dname "CN=Batal Faris App, O=Family, C=EG"
-            echo "::warning::No BATAL_KEYSTORE_B64 secret found — generated a one-off keystore. Updates over a previous install will require uninstalling first. Add the secret for a stable signature."
+            echo "::warning::No BATAL_KEY_PASSPHRASE secret found — generated a one-off keystore. Updates over a previous install will require uninstalling first. Add the secret for a stable signature."
           fi
 
       - name: Build release APK
-        env:
-          BATAL_KEYSTORE_PASS: ${{ secrets.BATAL_KEYSTORE_PASS || 'batal2026faris' }}
         run: gradle -p android assembleRelease
 
       - name: Rename APK
